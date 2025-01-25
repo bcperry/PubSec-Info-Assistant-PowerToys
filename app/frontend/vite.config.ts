@@ -30,7 +30,10 @@ export default defineConfig({
     },
     server: {
         proxy: {
-            "/": "http://localhost:5000"
+            "/get": "http://localhost:5000",
+        },
+        watch: {
+            usePolling: true,
         }
     },
     css: {
