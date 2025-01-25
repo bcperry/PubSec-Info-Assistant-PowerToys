@@ -31,6 +31,15 @@ export default defineConfig({
     server: {
         proxy: {
             "/get": "http://localhost:5000",
+            "/chat": "http://localhost:5000",
+            "/delete": "http://localhost:5000",
+            "/resubmit": "http://localhost:5000",
+            "/stream": "http://localhost:5000",
+            "/td": "http://localhost:5000",
+            "/refresh": "http://localhost:5000",
+            "/post": "http://localhost:5000",
+            "/process": "http://localhost:5000",
+            "/log": "http://localhost:5000",
         },
         watch: {
             usePolling: true,
