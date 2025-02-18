@@ -4,10 +4,13 @@
 import { Outlet, NavLink, Link } from "react-router-dom";
 import openai from "../../assets/openai.svg";
 import { WarningBanner } from "../../components/WarningBanner/WarningBanner";
+// import { SignInButton } from "../../components/Login/SignInButton";
 import styles from "./Layout.module.css";
 import { Title } from "../../components/Title/Title";
 import { getFeatureFlags, GetFeatureFlagsResponse } from "../../api";
 import { useEffect, useState } from "react";
+
+import { SignInButton } from "../../components/Login/SignInButton";
 
 export const Layout = () => {
     const [featureFlags, setFeatureFlags] = useState<GetFeatureFlagsResponse | null>(null);
@@ -46,6 +49,9 @@ export const Layout = () => {
                                 <NavLink to="/content" className={({ isActive }) => (isActive ? styles.headerNavPageLinkActive : styles.headerNavPageLink)}>
                                     Manage Content
                                 </NavLink>
+                            </li>
+                            <li  className={styles.headerNavLeftMargin}>
+                                <SignInButton/>
                             </li>
                             {featureFlags?.ENABLE_MATH_ASSISTANT &&
                                 <li className={styles.headerNavLeftMargin}>

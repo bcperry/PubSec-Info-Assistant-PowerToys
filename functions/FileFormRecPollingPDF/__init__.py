@@ -108,12 +108,20 @@ def main(msg: func.QueueMessage) -> None:
             
             if response_status == "succeeded":
                 # successful, so continue to document map and chunking
+                
                 statusLog.upsert_document(blob_name, f'{function_name} - Form Recognizer has completed processing and the analyze results have been received', StatusClassification.DEBUG)  
                 # build the document map     
                 statusLog.upsert_document(blob_name, f'{function_name} - Starting document map build', StatusClassification.DEBUG)  
                 document_map = utilities.build_document_map_pdf(blob_name, blob_uri, response_json["analyzeResult"], azure_blob_log_storage_container, enableDevCode)  
                 statusLog.upsert_document(blob_name, f'{function_name} - Document map build complete', StatusClassification.DEBUG)     
                 # create chunks
+
+                statusLog.upsert_document(blob_name, f'{function_name} - Utils Debugging: \
+                                          \nazure_blob_storage_account: {azure_blob_storage_account}, \
+                                          \nazure_blob_storage_endpoint:{azure_blob_storage_endpoint}, \
+                                          \nazure_blob_drop_storage_container:{azure_blob_drop_storage_container}, \
+                                          \nazure_blob_content_storage_container:{azure_blob_content_storage_container}, \
+                                          \nazure_credential:{azure_credential.__dict__}', StatusClassification.DEBUG)
                 statusLog.upsert_document(blob_name, f'{function_name} - Starting chunking', StatusClassification.DEBUG)  
                 chunk_count = utilities.build_chunks(document_map, blob_name, blob_uri, CHUNK_TARGET_SIZE)
                 statusLog.upsert_document(blob_name, f'{function_name} - Chunking complete, {chunk_count} chunks created.', StatusClassification.DEBUG)  

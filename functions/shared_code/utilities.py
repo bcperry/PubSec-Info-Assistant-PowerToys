@@ -85,13 +85,15 @@ class Utilities:
         """ Function to write a generic blob """
         # folder_set should be in the format of "<my_folder_name>/"
         # Get path and file name minus the root container
+
         blob_service_client = BlobServiceClient(
-            self.azure_blob_storage_endpoint,
-            credential=self.azure_credential
-            )
+        self.azure_blob_storage_endpoint,
+        credential=self.azure_credential
+        )
         block_blob_client = blob_service_client.get_blob_client(
             container=output_container, blob=f'{folder_set}{output_filename}')
         block_blob_client.upload_blob(content, overwrite=True)
+
 
     def sort_key(self, element):
         """ Function to sort elements by page number and role priority """

@@ -39,6 +39,8 @@ from approaches.tabulardataassistant import (
 )
 from shared_code.status_log import State, StatusClassification, StatusLog
 from azure.cosmos import CosmosClient
+from fastapi_azure_auth import SingleTenantAzureAuthorizationCodeBearer
+
 
 
 # === ENV Setup ===
@@ -277,7 +279,23 @@ app = FastAPI(
     description="A Python API to serve as Backend For the Information Assistant Web App",
     version="0.1.0",
     docs_url="/docs",
+    swagger_ui_oauth2_redirect_url='/oauth2-redirect',
+    swagger_ui_init_oauth={
+        'usePkceWithAuthorizationCodeGrant': True,
+        'clientId': "OPENAPI_CLIENT_ID", # this is set in the swagger_ui_init_oauth, uncomment for debugging
+        'scopes': "SCOPE_NAME",
+    },
 )
+
+
+# TODO: identify / add to environment variables
+azure_scheme = SingleTenantAzureAuthorizationCodeBearer(
+    app_client_id=ENV["APP_CLIENT_ID"],
+    tenant_id=ENV["TENANT_ID"],
+    scopes=ENV["SCOPES"],
+    cloud_base_url=ENV["CLOUD_BASE"],
+)
+
 
 @app.get("/", include_in_schema=False, response_class=RedirectResponse)
 async def root():
