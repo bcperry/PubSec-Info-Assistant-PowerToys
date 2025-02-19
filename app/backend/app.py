@@ -12,7 +12,7 @@ import urllib.parse
 import pandas as pd
 import pydantic
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Form
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Form, Security
 from fastapi.responses import RedirectResponse, StreamingResponse
 import openai
 from approaches.comparewebwithwork import CompareWebWithWork
@@ -40,8 +40,6 @@ from approaches.tabulardataassistant import (
 from shared_code.status_log import State, StatusClassification, StatusLog
 from azure.cosmos import CosmosClient
 from fastapi_azure_auth import SingleTenantAzureAuthorizationCodeBearer
-
-
 
 # === ENV Setup ===
 
@@ -92,7 +90,11 @@ ENV = {
     "ENABLE_TABULAR_DATA_ASSISTANT": "false",
     "MAX_CSV_FILE_SIZE": "7",
     "LOCAL_DEBUG": "false",
-    "AZURE_AI_CREDENTIAL_DOMAIN": "cognitiveservices.azure.com"
+    "AZURE_AI_CREDENTIAL_DOMAIN": "cognitiveservices.azure.com",
+    "CLOUD_BASE":None,
+    "CLIENT_ID":None,
+    "TENANT_ID": None,
+    "API_SCOPE_DESCRIPTION": None
     }
 
 for key, value in ENV.items():
@@ -272,6 +274,8 @@ chat_approaches = {
 }
 
 IS_READY = True
+SCOPE_NAME = f'api://{ENV["CLIENT_ID"]}/{ENV["API_SCOPE_DESCRIPTION"]}'
+SCOPES = {SCOPE_NAME: ENV["API_SCOPE_DESCRIPTION"]}
 
 # Create API
 app = FastAPI(
@@ -282,21 +286,21 @@ app = FastAPI(
     swagger_ui_oauth2_redirect_url='/oauth2-redirect',
     swagger_ui_init_oauth={
         'usePkceWithAuthorizationCodeGrant': True,
-        'clientId': "OPENAPI_CLIENT_ID", # this is set in the swagger_ui_init_oauth, uncomment for debugging
-        'scopes': "SCOPE_NAME",
+        'clientId': ENV["CLIENT_ID"], # this is set in the swagger_ui_init_oauth, uncomment for debugging
+        'scopes': SCOPE_NAME,
     },
 )
 
 
 # TODO: identify / add to environment variables
 azure_scheme = SingleTenantAzureAuthorizationCodeBearer(
-    app_client_id=ENV["APP_CLIENT_ID"],
+    app_client_id=ENV["CLIENT_ID"],
     tenant_id=ENV["TENANT_ID"],
-    scopes=ENV["SCOPES"],
+    scopes=SCOPES,
     cloud_base_url=ENV["CLOUD_BASE"],
 )
 
-
+print(azure_scheme)
 @app.get("/", include_in_schema=False, response_class=RedirectResponse)
 async def root():
     """Redirect to the index.html page"""
@@ -322,7 +326,8 @@ def health():
 
     return output
 
-@app.post("/chat")
+
+@app.post("/chat", dependencies=[Security(azure_scheme)])
 async def chat(request: Request):
     """Chat with the bot using a given approach
 

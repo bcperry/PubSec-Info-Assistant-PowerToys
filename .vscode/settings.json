@@ -17,5 +17,6 @@
     "cSpell.words": [
         "Codespaces",
         "referenceable"
-    ]
+    ],
+    "makefile.configureOnOpen": false
 }
