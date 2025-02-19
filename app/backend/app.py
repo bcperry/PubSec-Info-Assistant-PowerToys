@@ -300,7 +300,6 @@ azure_scheme = SingleTenantAzureAuthorizationCodeBearer(
     cloud_base_url=ENV["CLOUD_BASE"],
 )
 
-print(azure_scheme)
 @app.get("/", include_in_schema=False, response_class=RedirectResponse)
 async def root():
     """Redirect to the index.html page"""
