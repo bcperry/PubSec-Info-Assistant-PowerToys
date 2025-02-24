@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 from io import StringIO
-from typing import Optional
+from typing import Annotated, Optional
 from datetime import datetime
 import asyncio
 import logging
@@ -12,8 +12,9 @@ import urllib.parse
 import pandas as pd
 import pydantic
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Form, Security
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Form, Security, Depends
 from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi_azure_auth.exceptions import InvalidAuth
 import openai
 from approaches.comparewebwithwork import CompareWebWithWork
 from approaches.compareworkwithweb import CompareWorkWithWeb
@@ -277,6 +278,9 @@ IS_READY = True
 SCOPE_NAME = f'api://{ENV["CLIENT_ID"]}/{ENV["API_SCOPE_DESCRIPTION"]}'
 SCOPES = {SCOPE_NAME: ENV["API_SCOPE_DESCRIPTION"]}
 
+
+# === FastAPI Setup ===
+
 # Create API
 app = FastAPI(
     title="IA Web API",
@@ -292,7 +296,9 @@ app = FastAPI(
 )
 
 
-# TODO: identify / add to environment variables
+
+
+# TODO: identify / add to environment variables into the deployment pipeline
 azure_scheme = SingleTenantAzureAuthorizationCodeBearer(
     app_client_id=ENV["CLIENT_ID"],
     tenant_id=ENV["TENANT_ID"],
@@ -300,10 +306,64 @@ azure_scheme = SingleTenantAzureAuthorizationCodeBearer(
     cloud_base_url=ENV["CLOUD_BASE"],
 )
 
+# Add helper functions to gather information from the user's access token
+async def verify_data_manager(
+    token: Annotated[str, Security(azure_scheme)], 
+    request: Request
+):
+    '''
+    Verify that the user is a data_manager.  
+    This is used for authorization to data manager endpoints
+    Authentication is handled by the Security dependency
+    
+    :param token: The token to verify
+    :param request: The request object
+    :return: The token if the user is a data_manager
+    :raises InvalidAuth: If the user is not a data_manager
+
+    
+    '''
+    claims = token.claims
+    groups = claims.get("groups", [])
+    roles = claims.get("roles", [])
+    groups_and_roles = groups + roles
+
+    if "data_manager" not in groups_and_roles:
+        raise InvalidAuth('Required role missing', request=request)
+    return {"message": "Logged in user is data_manager."}
+
+async def get_roles(
+    token: Annotated[str, Security(azure_scheme)]
+):
+    '''
+    Get the roles of the user.  
+    This is used for authorization to data manager endpoints
+    Authentication is handled by the Security dependency
+    
+    :param token: The token to verify
+    :param request: The request object
+    :return: The token if the user is a data_manager
+    :raises InvalidAuth: If the user is not a data_manager
+
+    
+    '''
+    claims = token.claims
+    groups = claims.get("groups", [])
+    roles = claims.get("roles", [])
+    groups_and_roles = groups + roles
+
+    return groups_and_roles
+
 @app.get("/", include_in_schema=False, response_class=RedirectResponse)
 async def root():
     """Redirect to the index.html page"""
     return RedirectResponse(url="/index.html")
+
+# TODO: lets get rid of this endpoint before production
+@app.get("/token")
+async def admin_endpoint(token: str = Depends(azure_scheme)):
+    """Admin endpoint to test authentication"""
+    return token
 
 @app.get("/health", response_model=StatusResponse, tags=["health"])
 def health():
@@ -325,7 +385,6 @@ def health():
 
     return output
 
-
 @app.post("/chat", dependencies=[Security(azure_scheme)])
 async def chat(request: Request):
     """Chat with the bot using a given approach
@@ -339,6 +398,8 @@ async def chat(request: Request):
     Raises:
         dict: The error response if an exception occurs during the chat
     """
+
+    # TODO: call get_roles and insure intersection of overrides and roles only allows for users to query the role
     json_body = await request.json()
     approach = json_body.get("approach")
     try:
@@ -423,6 +484,7 @@ async def get_folders():
     Returns:
     - results: list of unique folders.
     """
+    # TODO: need to filter the folder list by role to folder assignments
     try:
         blob_container = blob_client.get_container_client(os.environ["AZURE_BLOB_STORAGE_UPLOAD_CONTAINER"])
         # Initialize an empty list to hold the folder paths
@@ -439,7 +501,6 @@ async def get_folders():
         log.exception("Exception in /getfolders")
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return folders
-
 
 @app.post("/deleteItems")
 async def delete_Items(request: Request):
@@ -470,7 +531,6 @@ async def delete_Items(request: Request):
         log.exception("Exception in /delete_Items")
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return True
-
 
 @app.post("/resubmitItems")
 async def resubmit_Items(request: Request):
@@ -514,9 +574,8 @@ async def resubmit_Items(request: Request):
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return True
 
-
 @app.post("/gettags")
-async def get_tags(request: Request):
+async def get_tags(token: str = Depends(azure_scheme)):
     """
     Get all tags.
 
@@ -528,25 +587,33 @@ async def get_tags(request: Request):
     """
     try:
         # Initialize an empty list to hold the tags
-        items = []              
+        # Get the roles associated with the user from the access token
+        # TODO: once we have a RBAC environement variable, let's make this call optional
+        roles = await get_roles(token)
+        unique_roles = set(roles)
+
         cosmos_client = CosmosClient(url=statusLog._url, credential=azure_credential, consistency_level='Session')     
-        database = cosmos_client.get_database_client(statusLog._database_name)               
-        container = database.get_container_client(statusLog._container_name) 
-        query_string = "SELECT DISTINCT VALUE t FROM c JOIN t IN c.tags"  
+        database = cosmos_client.get_database_client(statusLog._database_name)
+        container = database.get_container_client(statusLog._container_name)
+        query_string = "SELECT DISTINCT VALUE t FROM c JOIN t IN c.tags"
         items = list(container.query_items(
             query=query_string,
             enable_cross_partition_query=True
-        ))           
-
+        ))
+        print(f"items type: {type(items)}, items: ", items)
         # Extract and split tags
         unique_tags = set()
         for item in items:
             tags = item.split(',')
-            unique_tags.update(tags)                  
-                
+            unique_tags.update(tags)
+        print("unique_tags: ", unique_tags)
+
+        role_list = list(unique_tags.intersection(unique_roles))
+        print("role_list: ", role_list)
     except Exception as ex:
         log.exception("Exception in /gettags")
         raise HTTPException(status_code=500, detail=str(ex)) from ex
+    # TODO: once we have a RBAC environement variable, let's use that to return either the role_list or the unique tags
     return unique_tags
 
 @app.post("/logstatus")
@@ -613,7 +680,6 @@ async def get_info_data():
         "EMBEDDINGS_MODEL_VERSION": f"{EMBEDDING_MODEL_VERSION}",
     }
     return response
-
 
 @app.get("/getWarningBanner")
 async def get_warning_banner():
@@ -725,6 +791,7 @@ async def posttd(csv: UploadFile = File(...)):
     
     
     #return {"filename": csv.filename}
+
 @app.get("/process_td_agent_response")
 async def process_td_agent_response(retries=3, delay=1000, question: Optional[str] = None):
     save_df(DF_FINAL)
@@ -797,7 +864,6 @@ async def refresh():
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return {"status": "success"}
 
-
 @app.get("/stream")
 async def stream_response(question: str):
     try:
@@ -818,9 +884,6 @@ async def td_stream_response(question: str):
     except Exception as ex:
         log.exception("Exception in /stream")
         raise HTTPException(status_code=500, detail=str(ex)) from ex
-
-
-
 
 @app.get("/process_agent_response")
 async def stream_agent_response(question: str):
@@ -849,7 +912,6 @@ async def stream_agent_response(question: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
     return results
 
-
 @app.get("/getFeatureFlags")
 async def get_feature_flags():
     """
@@ -870,12 +932,12 @@ async def get_feature_flags():
     }
     return response
 
-@app.post("/file")  
+@app.post("/file", dependencies=[Depends(verify_data_manager)])
 async def upload_file(  
-    file: UploadFile = File(...),   
+    file: UploadFile = File(...),
     file_path: str = Form(...),
-    tags: str = Form(None)  
-):  
+    tags: str = Form(None)
+):
     """  
     Upload a file to Azure Blob Storage.  
     Parameters:  
