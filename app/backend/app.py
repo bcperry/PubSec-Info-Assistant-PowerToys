@@ -41,7 +41,7 @@ from approaches.tabulardataassistant import (
 from shared_code.status_log import State, StatusClassification, StatusLog
 from azure.cosmos import CosmosClient
 from fastapi_azure_auth import SingleTenantAzureAuthorizationCodeBearer
-
+from models import ChatRequest, ChatRequestOverrides, ChatTurn, Citation
 # === ENV Setup ===
 
 ENV = {
@@ -386,7 +386,7 @@ def health():
     return output
 
 @app.post("/chat", dependencies=[Security(azure_scheme)])
-async def chat(request: Request):
+async def chat(request: ChatRequest):
     """Chat with the bot using a given approach
 
     Args:
