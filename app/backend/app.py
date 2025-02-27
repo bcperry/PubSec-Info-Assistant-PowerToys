@@ -400,7 +400,7 @@ async def chat(request: ChatRequest):
     """
 
     # TODO: call get_roles and insure intersection of overrides and roles only allows for users to query the role
-    json_body = await request.json()
+    json_body = request.model_dump()
     approach = json_body.get("approach")
     try:
         impl = chat_approaches.get(Approaches(int(approach)))
