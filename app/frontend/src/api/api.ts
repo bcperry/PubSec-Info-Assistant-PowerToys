@@ -19,11 +19,26 @@ import { ChatResponse,
     FetchCitationFileResponse,
     } from "./models";
 
+import { msalInstance } from "../index";
+
+/* this function is used to get the access token from the msalInstance, 
+it should be used in any api call where authentication is required
+*/
+function getAccessToken() {
+    const accounts = msalInstance.getAllAccounts();
+    const account = accounts.length > 0 ? accounts[0] : null;
+    console.log("account", account);
+    return account?.idToken;
+}
+
 export async function chatApi(options: ChatRequest, signal: AbortSignal): Promise<Response> {
+    const token = getAccessToken();
     const response = await fetch("/chat", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+
         },
         body: JSON.stringify({
             history: options.history,
@@ -88,10 +103,12 @@ export async function getAllUploadStatus(options: GetUploadStatusRequest): Promi
 
 export async function deleteItem(options: DeleteItemRequest): Promise<boolean> {
     try {
+        const token = getAccessToken();
         const response = await fetch("/deleteItems", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({
                 path: options.path
@@ -137,10 +154,12 @@ export async function resubmitItem(options: ResubmitItemRequest): Promise<boolea
 
 
 export async function getFolders(): Promise<string[]> {
+    const token = getAccessToken();
     const response = await fetch("/getfolders", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
             })
@@ -161,10 +180,12 @@ export async function getFolders(): Promise<string[]> {
 
 
 export async function getTags(): Promise<string[]> {
+    const token = getAccessToken();
     const response = await fetch("/gettags", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
             })

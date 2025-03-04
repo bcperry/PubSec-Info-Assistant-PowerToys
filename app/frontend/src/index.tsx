@@ -10,7 +10,8 @@ import { MsalProvider } from '@azure/msal-react';
 
 import { PublicClientApplication } from '@azure/msal-browser';
 import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal, useMsalAuthentication } from "@azure/msal-react";
-import { InteractionType, InteractionRequiredAuthError } from '@azure/msal-browser';import { loginRequest, msalConfig } from "./auth/authConfig";
+import { InteractionType, InteractionRequiredAuthError } from '@azure/msal-browser';
+import { loginRequest, msalConfig } from "./auth/authConfig";
 
 import "./index.css";
 
@@ -26,31 +27,8 @@ initializeIcons();
 const msalInstance = new PublicClientApplication(msalConfig);
 
 await msalInstance.initialize();
-// // Get token using popup experience
-// try {
-//     const graphToken = await msalInstance.acquireTokenPopup({
-//         scopes: ["User.Read"]
-//     });
-//     console.log("graphToken", graphToken);
-// } catch(error) {
-//     console.log(error)
-// }
 
-// // Call the Graph API
-// const headers = new Headers();
-// const bearer = `Bearer ${graphToken}`;
-
-// headers.append("Authorization", bearer);
-
-// fetch("https://graph.microsoft.us/v1.0/me", {
-//     method: "GET",
-//     headers: headers
-// })
-
-// console.log("graphToken", graphToken);
-// console.log("msalInstance", msalInstance);
-
-
+export { msalInstance };
 
 export default function App() {
 
@@ -65,7 +43,8 @@ export default function App() {
     const accounts = msalInstance.getAllAccounts();
     const account = accounts.length > 0 ? accounts[0] : null;
     
-    console.log("account", account?.idTokenClaims?.roles);
+    console.log("account", account);
+    console.log("token", account?.idToken);
 
     return (
             <HashRouter>

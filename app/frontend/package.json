@@ -9,8 +9,8 @@
         "watch": "tsc && vite build --watch"
     },
     "dependencies": {
-        "@azure/msal-browser": "^4.0.2",
-        "@azure/msal-react": "^3.0.2",
+        "@azure/msal-browser": "^4.5.0",
+        "@azure/msal-react": "^3.0.5",
         "@fluentui/react": "8.121.8",
         "@fluentui/react-icons": "2.0.266",
         "@react-spring/web": "9.7.5",

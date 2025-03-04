@@ -360,12 +360,12 @@ async def root():
     return RedirectResponse(url="/index.html")
 
 # TODO: lets get rid of this endpoint before production
-@app.get("/token")
+@app.get("/token", tags=["RBAC Debugging"])
 async def admin_endpoint(token: str = Depends(azure_scheme)):
     """Admin endpoint to test authentication"""
     return token
 
-@app.get("/health", response_model=StatusResponse, tags=["health"])
+@app.get("/health", response_model=StatusResponse, tags=["Health"])
 def health():
     """Returns the health of the API
 
@@ -385,7 +385,7 @@ def health():
 
     return output
 
-@app.post("/chat", dependencies=[Security(azure_scheme)])
+@app.post("/chat", dependencies=[Security(azure_scheme)], tags=["Chat"])
 async def chat(request: ChatRequest):
     """Chat with the bot using a given approach
 
@@ -402,6 +402,8 @@ async def chat(request: ChatRequest):
     # TODO: call get_roles and insure intersection of overrides and roles only allows for users to query the role
     json_body = request.model_dump()
     approach = json_body.get("approach")
+
+    
     try:
         impl = chat_approaches.get(Approaches(int(approach)))
         if not impl:
@@ -425,7 +427,7 @@ async def chat(request: ChatRequest):
         log.error("Error in chat:: %s", ex)
         raise HTTPException(status_code=500, detail=str(ex)) from ex
 
-@app.post("/getalluploadstatus")
+@app.post("/getalluploadstatus", tags=["Data Management"])
 async def get_all_upload_status(request: Request):
     """
     Get the status and tags of all file uploads in the last N hours.
@@ -473,8 +475,8 @@ async def get_all_upload_status(request: Request):
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return results
 
-@app.post("/getfolders")
-async def get_folders():
+@app.post("/getfolders", tags=["Chat"])
+async def get_folders(roles: list = Depends(get_roles)):
     """
     Get all folders.
 
@@ -485,6 +487,7 @@ async def get_folders():
     - results: list of unique folders.
     """
     # TODO: need to filter the folder list by role to folder assignments
+    print("roles: ", roles)
     try:
         blob_container = blob_client.get_container_client(os.environ["AZURE_BLOB_STORAGE_UPLOAD_CONTAINER"])
         # Initialize an empty list to hold the folder paths
@@ -502,7 +505,7 @@ async def get_folders():
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return folders
 
-@app.post("/deleteItems")
+@app.post("/deleteItems", dependencies=[Depends(verify_data_manager)], tags=["Data Management"])
 async def delete_Items(request: Request):
     """
     Delete a blob.
@@ -532,7 +535,7 @@ async def delete_Items(request: Request):
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return True
 
-@app.post("/resubmitItems")
+@app.post("/resubmitItems", dependencies=[Depends(verify_data_manager)], tags=["Data Management"])
 async def resubmit_Items(request: Request):
     """
     Resubmit a blob.
@@ -574,8 +577,8 @@ async def resubmit_Items(request: Request):
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return True
 
-@app.post("/gettags")
-async def get_tags(token: str = Depends(azure_scheme)):
+@app.post("/gettags", tags=["Chat"])
+async def get_tags(roles: list = Depends(get_roles)):
     """
     Get all tags.
 
@@ -588,8 +591,6 @@ async def get_tags(token: str = Depends(azure_scheme)):
     try:
         # Initialize an empty list to hold the tags
         # Get the roles associated with the user from the access token
-        # TODO: once we have a RBAC environement variable, let's make this call optional
-        roles = await get_roles(token)
         unique_roles = set(roles)
 
         cosmos_client = CosmosClient(url=statusLog._url, credential=azure_credential, consistency_level='Session')     
@@ -600,23 +601,27 @@ async def get_tags(token: str = Depends(azure_scheme)):
             query=query_string,
             enable_cross_partition_query=True
         ))
-        print(f"items type: {type(items)}, items: ", items)
+        
         # Extract and split tags
         unique_tags = set()
         for item in items:
             tags = item.split(',')
             unique_tags.update(tags)
-        print("unique_tags: ", unique_tags)
 
-        role_list = list(unique_tags.intersection(unique_roles))
-        print("role_list: ", role_list)
+        if "data_manager" in unique_roles:
+            # If the user is a data manager, return all tags
+            available_tags = list(unique_tags)
+        else:
+            # If the user is not a data manager, return only the tags that match their roles
+            available_tags = list(unique_tags.intersection(unique_roles))
+
     except Exception as ex:
         log.exception("Exception in /gettags")
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     # TODO: once we have a RBAC environement variable, let's use that to return either the role_list or the unique tags
-    return unique_tags
+    return available_tags
 
-@app.post("/logstatus")
+@app.post("/logstatus", tags=["Data Management"])
 async def logstatus(request: Request):
     """
     Log the status of a file upload to CosmosDB.
@@ -647,7 +652,7 @@ async def logstatus(request: Request):
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     raise HTTPException(status_code=200, detail="Success")
 
-@app.get("/getInfoData")
+@app.get("/getInfoData", tags=["Application Information"])
 async def get_info_data():
     """
     Get the info data for the app.
@@ -681,7 +686,7 @@ async def get_info_data():
     }
     return response
 
-@app.get("/getWarningBanner")
+@app.get("/getWarningBanner", tags=["Application Information"])
 async def get_warning_banner():
     """Get the warning banner text"""
     response ={
@@ -689,7 +694,7 @@ async def get_warning_banner():
         }
     return response
 
-@app.get("/getMaxCSVFileSize")
+@app.get("/getMaxCSVFileSize", tags=["Tabular Data Assistant"])
 async def get_max_csv_file_size():
     """Get the max csv size"""
     response ={
@@ -697,7 +702,7 @@ async def get_max_csv_file_size():
         }
     return response
 
-@app.post("/getcitation")
+@app.post("/getcitation", tags=["Chat"])
 async def get_citation(request: Request):
     """
     Get the citation for a given file
@@ -720,7 +725,7 @@ async def get_citation(request: Request):
     return results
 
 # Return APPLICATION_TITLE
-@app.get("/getApplicationTitle")
+@app.get("/getApplicationTitle", tags=["Application Information"])
 async def get_application_title():
     """Get the application title text
     
@@ -732,7 +737,7 @@ async def get_application_title():
         }
     return response
 
-@app.get("/getalltags")
+@app.get("/getalltags", tags=["Chat"])
 async def get_all_tags():
     """
     Get the status of all tags in the system
@@ -747,7 +752,7 @@ async def get_all_tags():
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return results
 
-@app.get("/getTempImages")
+@app.get("/getTempImages", tags=["Chat"])
 async def get_temp_images():
     """Get the images in the temp directory
 
@@ -757,7 +762,7 @@ async def get_temp_images():
     images = get_images_in_temp()
     return {"images": images}
 
-@app.get("/getHint")
+@app.get("/getHint", tags=["Chat"])
 async def getHint(question: Optional[str] = None):
     """
     Get the hint for a question
@@ -775,7 +780,7 @@ async def getHint(question: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return results
 
-@app.post("/posttd")
+@app.post("/posttd", tags=["Tabular Data Assistant"])
 async def posttd(csv: UploadFile = File(...)):
     try:
         global DF_FINAL
@@ -792,7 +797,7 @@ async def posttd(csv: UploadFile = File(...)):
     
     #return {"filename": csv.filename}
 
-@app.get("/process_td_agent_response")
+@app.get("/process_td_agent_response", tags=["Tabular Data Assistant"])
 async def process_td_agent_response(retries=3, delay=1000, question: Optional[str] = None):
     save_df(DF_FINAL)
     if question is None:
@@ -817,7 +822,7 @@ async def process_td_agent_response(retries=3, delay=1000, question: Optional[st
             else:
                 raise HTTPException(status_code=500, detail=str(ex)) from ex
 
-@app.get("/getTdAnalysis")
+@app.get("/getTdAnalysis", tags=["Tabular Data Assistant"])
 async def getTdAnalysis(retries=3, delay=1, question: Optional[str] = None):
     global DF_FINAL
     if question is None:
@@ -844,7 +849,7 @@ async def getTdAnalysis(retries=3, delay=1, question: Optional[str] = None):
             else:
                 raise HTTPException(status_code=500, detail=str(ex)) from ex
 
-@app.post("/refresh")
+@app.post("/refresh", tags=["Tabular Data Assistant"])
 async def refresh():
     """
     Refresh the agent's state.
@@ -864,7 +869,7 @@ async def refresh():
         raise HTTPException(status_code=500, detail=str(ex)) from ex
     return {"status": "success"}
 
-@app.get("/stream")
+@app.get("/stream", tags=["Math Assistant"])
 async def stream_response(question: str):
     try:
         stream = stream_agent_responses(question)
@@ -873,7 +878,7 @@ async def stream_response(question: str):
         log.exception("Exception in /stream")
         raise HTTPException(status_code=500, detail=str(ex)) from ex
 
-@app.get("/tdstream")
+@app.get("/tdstream", tags=["Tabular Data Assistant"])
 async def td_stream_response(question: str):
     save_df(DF_FINAL)
     
@@ -885,7 +890,7 @@ async def td_stream_response(question: str):
         log.exception("Exception in /stream")
         raise HTTPException(status_code=500, detail=str(ex)) from ex
 
-@app.get("/process_agent_response")
+@app.get("/process_agent_response", tags=["Tabular Data Assistant"])
 async def stream_agent_response(question: str):
     """
     Stream the response of the agent for a given question.
@@ -912,7 +917,7 @@ async def stream_agent_response(question: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
     return results
 
-@app.get("/getFeatureFlags")
+@app.get("/getFeatureFlags", tags=["Application Information"])
 async def get_feature_flags():
     """
     Get the feature flag settings for the app.
@@ -932,7 +937,7 @@ async def get_feature_flags():
     }
     return response
 
-@app.post("/file", dependencies=[Depends(verify_data_manager)])
+@app.post("/file", dependencies=[Depends(verify_data_manager)], tags=["Data Management"])
 async def upload_file(  
     file: UploadFile = File(...),
     file_path: str = Form(...),
@@ -963,7 +968,7 @@ async def upload_file(
         log.exception("Exception in /file")  
         raise HTTPException(status_code=500, detail=str(ex)) from ex  
 
-@app.post("/get-file")
+@app.post("/get-file", tags=["Chat"])
 async def get_file(request: Request):
     data = await request.json()
     file_path = data['path']

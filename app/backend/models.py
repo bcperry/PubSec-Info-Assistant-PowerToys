@@ -27,6 +27,7 @@ class ChatRequestOverrides(BaseModel):
     response_temp: float = 0.6
     selected_folders: str = "All"
     selected_tags: str = ""
+    byPassRAG: bool = True
 
 class Citation(BaseModel):
     citation: str
