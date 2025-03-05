@@ -24,15 +24,33 @@ import { msalInstance } from "../index";
 /* this function is used to get the access token from the msalInstance, 
 it should be used in any api call where authentication is required
 */
-function getAccessToken() {
+async function getAccessToken() {
     const accounts = msalInstance.getAllAccounts();
     const account = accounts.length > 0 ? accounts[0] : null;
-    console.log("account", account);
-    return account?.idToken;
+    if (!account) {
+        console.error("No account found");
+        return null;
+    }
+    
+    try {
+        // Use acquireTokenSilent to get a valid token
+        // This automatically checks for expiration and refreshes if needed
+        const silentRequest = {
+            scopes: ["openid", "profile"], // Adjust scopes as needed for your app
+            account: account
+        };
+        
+        const response = await msalInstance.acquireTokenSilent(silentRequest);
+        console.log("Token acquired silently:", response);
+        return response.idToken;
+    } catch (error) {
+        console.error("Error acquiring token:", error);
+        return null;
+    }
 }
 
 export async function chatApi(options: ChatRequest, signal: AbortSignal): Promise<Response> {
-    const token = getAccessToken();
+    const token = await getAccessToken();
     const response = await fetch("/chat", {
         method: "POST",
         headers: {
@@ -103,7 +121,7 @@ export async function getAllUploadStatus(options: GetUploadStatusRequest): Promi
 
 export async function deleteItem(options: DeleteItemRequest): Promise<boolean> {
     try {
-        const token = getAccessToken();
+        const token = await getAccessToken();
         const response = await fetch("/deleteItems", {
             method: "POST",
             headers: {
@@ -154,7 +172,7 @@ export async function resubmitItem(options: ResubmitItemRequest): Promise<boolea
 
 
 export async function getFolders(): Promise<string[]> {
-    const token = getAccessToken();
+    const token = await getAccessToken();
     const response = await fetch("/getfolders", {
         method: "POST",
         headers: {
@@ -180,7 +198,7 @@ export async function getFolders(): Promise<string[]> {
 
 
 export async function getTags(): Promise<string[]> {
-    const token = getAccessToken();
+    const token = await getAccessToken();
     const response = await fetch("/gettags", {
         method: "POST",
         headers: {
