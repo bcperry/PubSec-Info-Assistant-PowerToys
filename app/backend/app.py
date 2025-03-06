@@ -499,7 +499,13 @@ async def get_folders(roles: list = Depends(get_roles)):
             # Extract the folder path if exists
             folder_path = os.path.dirname(blob.name)
             if folder_path and folder_path not in folders:
-                folders.append(folder_path)
+                if "data_manager" in roles:
+                    folders.append(folder_path)
+                else:
+                    for role in roles:
+                        if role in folder_path:
+                            folders.append(folder_path)
+                            break
     except Exception as ex:
         log.exception("Exception in /getfolders")
         raise HTTPException(status_code=500, detail=str(ex)) from ex

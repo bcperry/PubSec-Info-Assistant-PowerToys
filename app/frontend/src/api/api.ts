@@ -41,7 +41,7 @@ async function getAccessToken() {
         };
         
         const response = await msalInstance.acquireTokenSilent(silentRequest);
-        console.log("Token acquired silently:", response);
+        console.log("Token acquired");
         return response.idToken;
     } catch (error) {
         console.error("Error acquiring token:", error);

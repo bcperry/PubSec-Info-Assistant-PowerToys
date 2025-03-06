@@ -43,8 +43,9 @@ export default function App() {
     const accounts = msalInstance.getAllAccounts();
     const account = accounts.length > 0 ? accounts[0] : null;
     
-    console.log("account", account);
-    console.log("token", account?.idToken);
+    // TODO: delete debugging log
+    // console.log("account", account);
+    // console.log("token", account?.idToken);
 
     return (
             <HashRouter>

@@ -38,6 +38,7 @@ interface MsalConfig {
 
 export const msalConfig: MsalConfig = {
     auth: {
+        //TODO: get these from environment variables
         clientId: "44c241f0-d5d2-420e-9cdd-ad37da27b89b", // Replace with your Azure AD app client ID
         authority: "https://login.microsoftonline.us/03f141f3-496d-4319-bbea-a3e9286cab10", // Replace with your tenant ID
         redirectUri: "http://localhost:5173", // Replace with your redirect URI
@@ -80,7 +81,7 @@ export const msalConfig: MsalConfig = {
  * https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-permissions-and-consent#openid-connect-scopes
  */
 export const loginRequest = {
-    scopes: ["openid"],
+    scopes: ["openid", "profile"],
 };
 
 
